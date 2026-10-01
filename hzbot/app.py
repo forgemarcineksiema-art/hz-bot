@@ -34,6 +34,7 @@ from .session import Session
 log = logging.getLogger("hzbot")
 WEB_DIR = Path(__file__).parent / "web"
 SIM_SPEEDS = (1, 60, 300, 1200)
+MAX_UPLOAD = 600 * 1024 * 1024  # HAR files with game assets can be big
 
 
 class RingLog(logging.Handler):
@@ -239,6 +240,29 @@ class Controller:
         finally:
             self.mode = "stopped"
 
+    def import_har(self, data: bytes) -> dict:
+        from .capture import merge_and_save
+        from .har import import_har
+
+        with self._lock:
+            if self.mode != "stopped":
+                raise ValueError("Zatrzymaj bota przed łączeniem z grą.")
+            self.mode, self.error = "capture", None
+        try:
+            cfg = self.config()
+            report = import_har(data, fallback_page=f"https://{cfg.server}.herozerogame.com/")
+            session = merge_and_save(report, cfg.session_file)
+            self.capture_result = {
+                "active": False, "requests": report.requests, "salt": bool(session.salt),
+                "logged_in": session.logged_in, "login_template": bool(session.login_template),
+                "notes": report.notes, "source": "har",
+            }
+            log.info("Zaimportowano połączenie z pliku HAR: %d żądań gry, sól %s", report.requests,
+                     "znaleziona" if session.salt else "NIE znaleziona")
+            return self.capture_result
+        finally:
+            self.mode = "stopped"
+
     def finish_capture(self) -> None:
         self._capture_done.set()
 
@@ -336,6 +360,8 @@ def make_handler(ctrl: Controller, allowed_hosts: set[str] | None):
             if not self._host_ok() or self.headers.get("X-HZBot") != "1":
                 return self._send(403, b"forbidden", "text/plain")
             path = urlparse(self.path).path
+            if path == "/api/import":
+                return self._import()
             try:
                 body = self._body()
                 if path == "/api/start":
@@ -355,6 +381,18 @@ def make_handler(ctrl: Controller, allowed_hosts: set[str] | None):
             except (ValueError, OSError, GameError, TransportError, RuntimeError) as exc:
                 return self._json({"error": str(exc)}, 400)
             self._json({"ok": True})
+
+        def _import(self) -> None:
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 < length <= MAX_UPLOAD:
+                return self._json({"error": "Plik jest pusty albo za duży."}, 400)
+            data = self.rfile.read(length)
+            try:
+                self._json(ctrl.import_har(data))
+            except (ValueError, OSError) as exc:
+                self._json({"error": str(exc)}, 400)
+            finally:
+                del data  # contains the user's password and session
 
     return Handler
 

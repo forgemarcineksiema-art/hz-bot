@@ -35,9 +35,28 @@ dlatego bot **nie ma ich na sztywno**. Zamiast tego komenda `capture`:
    pod adresem <http://127.0.0.1:8777>.
 3. W panelu przejdź trzy kroki z karty **Pierwsze uruchomienie**:
    1. wpisz serwer (np. `pl1`),
-   2. kliknij **Otwórz grę i połącz** – zaloguj się w przeglądarce, rozpocznij i odbierz misję,
-      stocz pojedynek, potem kliknij **Gotowe**,
+   2. **połącz z grą** – patrz niżej,
    3. wybierz tryb **Na sucho** (bot tylko pokazuje decyzje) albo **Gra** i kliknij **Start**.
+
+### Łączenie z grą (captcha „Nie jestem robotem”)
+
+Bot musi raz podejrzeć ruch prawdziwej gry. Zalecany sposób działa w Twojej **zwykłej
+przeglądarce**, więc captcha zachowuje się normalnie:
+
+1. Otwórz grę (np. `https://pl1.herozerogame.com`) w Chrome, Edge albo Firefoksie.
+2. Naciśnij `F12` → zakładka **Sieć** (*Network*) → zaznacz **Zachowaj log** (*Preserve log*)
+   → odśwież stronę (`F5`).
+3. Zaloguj się, rozpocznij i odbierz misję, stocz pojedynek.
+4. W zakładce Sieć kliknij **Eksportuj HAR** (*Export HAR*, ikona pobierania) albo prawym
+   przyciskiem → **Zapisz wszystko jako HAR**.
+5. Przeciągnij plik `.har` do panelu (albo: `python -m hzbot import plik.har`).
+6. Usuń plik `.har` – zawiera Twoje hasło i sesję.
+
+Sposób automatyczny („Otwórz grę w oknie bota”) otwiera osobne okno sterowane przez bota.
+Google rozpoznaje takie okno, więc captcha może się w nim nie zaliczyć.
+
+Jeśli gra wymaga captcha przy logowaniu, bot nie zaloguje się sam po wygaśnięciu sesji.
+Wtedy zatrzyma się z komunikatem i trzeba powtórzyć import.
 
 Panel pokazuje na żywo:
 - co bot teraz robi, z odliczaniem do końca misji lub pracy,
@@ -66,7 +85,8 @@ Wszystko, co robi panel, jest też dostępne z terminala:
 
 ```bash
 cp config.example.yaml config.yaml                   # i ustaw swój serwer (np. pl1)
-python -m hzbot capture --server pl1                 # połączenie z grą (Enter kończy)
+python -m hzbot import zapis.har                     # połączenie z grą z pliku HAR
+python -m hzbot capture --server pl1                 # albo: okno przeglądarki bota (Enter kończy)
 python -m hzbot doctor --ping                        # diagnostyka
 python -m hzbot run --dry-run                        # na sucho
 python -m hzbot run                                  # gra
@@ -109,6 +129,7 @@ Po zakończeniu (także Ctrl+C) wypisuje podsumowanie. Wszystkie opcje opisuje
 hzbot/
   auth.py      podpis md5 i wykrywanie soli z kodu JS
   capture.py   przechwytywanie protokołu z przeglądarki (Playwright)
+  har.py       import protokołu z pliku HAR z Twojej przeglądarki
   client.py    klient request.php (podpisy, ponawianie, błędy, dry-run)
   session.py   plik sesji
   state.py     lokalny stan gry składany z odpowiedzi serwera

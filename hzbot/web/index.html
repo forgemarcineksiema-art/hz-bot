@@ -116,6 +116,15 @@ h3 { margin: 0 0 4px; font-size: 16px; }
 .num { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-weight: 800; color: var(--muted); }
 .step.done .num { background: var(--ok-bg); color: var(--ok); }
 .step .body { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.howto { margin-top: 12px; background: var(--surface-2); border-radius: 12px; padding: 14px 16px; }
+.howto-title { font-weight: 700; display: flex; gap: 8px; align-items: center; }
+.howto ol { margin: 8px 0 12px; padding-left: 20px; }
+.howto li { margin-bottom: 4px; }
+.howto a { color: var(--accent); font-weight: 600; }
+kbd { font: 12px ui-monospace, monospace; background: var(--surface); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; }
+.drop { display: flex; justify-content: center; align-items: center; min-height: 70px; padding: 12px; border: 2px dashed var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--accent); }
+.drop.busy { opacity: .6; pointer-events: none; }
 .callout { border-radius: 10px; padding: 12px 14px; font-size: 14px; }
 .callout.info { background: var(--info-bg); color: var(--info); }
 .callout.bad { background: var(--bad-bg); color: var(--bad); }
@@ -224,9 +233,29 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
           </div>
           <div class="step" id="step2">
             <div class="num">2</div>
-            <div class="body">
-              <div><h3>Połącz z grą</h3><div class="muted small">Otworzy się przeglądarka z grą. Zaloguj się i zagraj chwilę – bot nauczy się, jak rozmawiać z serwerem.</div></div>
-              <button class="btn primary" id="captureBtn">Otwórz grę i połącz</button>
+            <div>
+              <h3>Połącz z grą</h3>
+              <div class="muted small">Bot musi raz podejrzeć, jak Twoja przeglądarka rozmawia z grą. Zajmuje to ok. 2 minuty.</div>
+              <div class="howto">
+                <div class="howto-title">Przez Twoją przeglądarkę <span class="chip ok">zalecane</span></div>
+                <ol class="small">
+                  <li>Otwórz <a id="gameLink" target="_blank" rel="noopener">grę</a> w swojej zwykłej przeglądarce (Chrome, Edge, Firefox).</li>
+                  <li>Naciśnij <kbd>F12</kbd>, przejdź do zakładki <b>Sieć</b> (<i>Network</i>), zaznacz <b>Zachowaj log</b> (<i>Preserve log</i>) i odśwież stronę klawiszem <kbd>F5</kbd>.</li>
+                  <li>Zaloguj się – captcha „Nie jestem robotem” zadziała normalnie. Rozpocznij i odbierz misję, stocz pojedynek.</li>
+                  <li>W zakładce Sieć kliknij ikonę pobierania <b>Eksportuj HAR</b> (<i>Export HAR</i>) albo prawym przyciskiem na liście → <b>Zapisz wszystko jako HAR</b>.</li>
+                  <li>Wskaż zapisany plik tutaj:</li>
+                </ol>
+                <label class="drop" id="drop">
+                  <input type="file" id="harFile" accept=".har,application/json" hidden>
+                  <span><b>Wybierz plik .har</b> albo przeciągnij go tutaj</span>
+                </label>
+                <div class="muted small" style="margin-top:6px">Plik zawiera Twoje hasło i sesję. Bot go nie zapisuje – po imporcie usuń go z dysku.</div>
+              </div>
+              <details class="small" style="margin-top:10px">
+                <summary>Albo automatycznie, w oknie przeglądarki bota</summary>
+                <p class="muted" style="margin-top:0">Bot otworzy własne okno z grą. Google rozpoznaje takie okno jako sterowane automatycznie, więc captcha „Nie jestem robotem” może się w nim nie zaliczyć – wtedy użyj sposobu powyżej.</p>
+                <button class="btn" id="captureBtn">Otwórz grę w oknie bota</button>
+              </details>
             </div>
           </div>
           <div class="callout info hidden" id="captureActive">
@@ -397,10 +426,35 @@ document.querySelectorAll("#kindSeg button").forEach((b) => b.onclick = () => {
 });
 $("startBtn").onclick = () => act(() => api("/api/start", { kind, speed: Number($("speed").value) }));
 $("stopBtn").onclick = () => act(() => api("/api/stop", {}), "Bot zatrzymany");
-$("captureBtn").onclick = $("recaptureBtn").onclick = () => {
+let forceSetup = false, importing = false;
+$("captureBtn").onclick = () => act(() => api("/api/capture/start", {}), "Otwieram przeglądarkę…");
+$("recaptureBtn").onclick = () => {
+  forceSetup = true;
   document.querySelector('nav button[data-tab="panel"]').click();
-  act(() => api("/api/capture/start", {}), "Otwieram przeglądarkę…");
+  refresh().then(() => $("step2").scrollIntoView({ behavior: "smooth", block: "center" }));
 };
+async function importHar(file) {
+  if (!file) return;
+  const drop = $("drop");
+  importing = true;
+  drop.classList.add("busy"); drop.querySelector("span").textContent = `Analizuję ${file.name}…`;
+  try {
+    const r = await fetch("/api/import", {
+      method: "POST", headers: { "Content-Type": "application/octet-stream", "X-HZBot": "1" }, body: file,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    toast(data.salt && data.logged_in ? "Połączono z grą!" : "Zaimportowano, ale połączenie jest niepełne");
+  } catch (e) { toast(e.message); }
+  importing = false;
+  drop.classList.remove("busy"); drop.querySelector("span").innerHTML = "<b>Wybierz plik .har</b> albo przeciągnij go tutaj";
+  $("harFile").value = "";
+  refresh();
+}
+$("harFile").onchange = () => importHar($("harFile").files[0]);
+$("drop").addEventListener("dragover", (e) => { e.preventDefault(); $("drop").classList.add("over"); });
+$("drop").addEventListener("dragleave", () => $("drop").classList.remove("over"));
+$("drop").addEventListener("drop", (e) => { e.preventDefault(); $("drop").classList.remove("over"); importHar(e.dataTransfer.files[0]); });
 $("captureDone").onclick = () => act(() => api("/api/capture/finish", {}), "Analizuję…");
 $("setupServerSave").onclick = () => act(async () => {
   const server = $("setupServer").value.trim();
@@ -444,12 +498,15 @@ function render() {
   $("errorText").textContent = s.error || "";
   const capActive = s.capture && s.capture.active;
   const capDone = s.capture && !s.capture.active && !running;
-  $("setupCard").classList.toggle("hidden", setup.ready && !capActive && !capDone);
+  $("setupCard").classList.toggle("hidden", setup.ready && !capActive && !capDone && !forceSetup);
+  const gameUrl = `https://${setup.server || "pl1"}.herozerogame.com/`;
+  $("gameLink").href = gameUrl; $("gameLink").textContent = gameUrl.replace("https://", "").replace(/\/$/, "");
   $("step1").classList.toggle("done", setup.config_exists);
   $("step2").classList.toggle("done", setup.ready);
   if (document.activeElement !== $("setupServer")) $("setupServer").value = setup.server || "";
   $("captureActive").classList.toggle("hidden", !capActive);
   $("captureBtn").disabled = s.mode !== "stopped";
+  $("drop").classList.toggle("busy", s.mode !== "stopped" || importing);
   const cr = $("captureResult"), c = s.capture;
   if (c && !c.active) {
     cr.classList.remove("hidden");
@@ -458,7 +515,7 @@ function render() {
       const ok = c.salt && (c.logged_in || c.login_template);
       cr.className = "callout " + (ok ? "ok" : "warn");
       cr.textContent = (ok ? "Połączono! " : "Połączenie niepełne. ") +
-        `Przechwycono ${c.requests} żądań; podpis: ${c.salt ? "OK" : "nie znaleziono"}; sesja: ${c.logged_in ? "OK" : "brak"}.` +
+        `Żądań gry: ${c.requests}; podpis: ${c.salt ? "OK" : "nie znaleziono"}; sesja: ${c.logged_in ? "OK" : "brak"}.` +
         (c.notes && c.notes.length ? " " + c.notes.join(" ") : "") + (ok ? " Sprawdź jeszcze zakładkę Diagnostyka." : "");
     }
   } else cr.classList.add("hidden");

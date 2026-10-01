@@ -120,3 +120,21 @@ def test_capture_from_panel(ctrl, monkeypatch, tmp_path):
     assert Session.load(tmp_path / Config().session_file).salt == salt
     assert ctrl.setup_state()["ready"]
     assert ctrl.doctor()["actions"][1]["status"] == "ok"  # sync observed
+
+
+def test_import_har_over_http(server, ctrl, tmp_path, monkeypatch):
+    from tests.test_har import SALT, form, make_har, post, script
+
+    data = make_har(script(f'k="{SALT}"'), post(form("syncGame")))
+    req = urllib.request.Request(server + "/api/import", data=data, method="POST",
+                                 headers={"X-HZBot": "1", "Content-Type": "application/octet-stream"})
+    with urllib.request.urlopen(req, timeout=5) as r:
+        result = json.loads(r.read())
+    assert result["salt"] and result["logged_in"]
+    assert ctrl.setup_state()["ready"]
+    assert ctrl.status()["mode"] == "stopped"
+
+    req = urllib.request.Request(server + "/api/import", data=b"garbage", method="POST", headers={"X-HZBot": "1"})
+    with pytest.raises(urllib.error.HTTPError) as e:
+        urllib.request.urlopen(req, timeout=5)
+    assert e.value.code == 400

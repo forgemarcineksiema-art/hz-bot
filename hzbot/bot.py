@@ -153,8 +153,8 @@ class Bot:
     def _relogin(self, err: GameError) -> None:
         if not (self.cfg.email and self.cfg.password and self.client.session.login_template):
             raise BotStopped(
-                f"Sesja wygasła ({err.code}). Uruchom ponownie `hzbot capture` "
-                "albo podaj e-mail i hasło w konfiguracji."
+                f"Sesja wygasła ({err.code}). Połącz bota z grą ponownie "
+                "(panel: „Połącz z grą” albo `hzbot import`)."
             ) from err
         log.warning("Sesja wygasła (%s) - loguję ponownie", err.code)
         self.client.session.user_session_id = ""

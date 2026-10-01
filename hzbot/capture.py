@@ -56,7 +56,15 @@ def analyze(request_url: str, forms: list[dict[str, str]], sources: list[str]) -
 
     login_forms = [f for f in forms if _is_login(f)]
     if login_forms:
-        session.login_template = _login_template(login_forms[-1])
+        if any("captcha" in k.lower() for k in login_forms[-1]):
+            # A captcha token is single-use: replaying this login would never work.
+            notes.append(
+                "Logowanie w grze wymaga captcha, więc bot nie będzie logował się sam. "
+                "Gdy sesja wygaśnie, połącz bota z grą ponownie."
+            )
+            login_forms = []
+        else:
+            session.login_template = _login_template(login_forms[-1])
     game_forms = [f for f in forms if not _is_login(f)]
     authed = [f for f in game_forms if f.get("user_session_id") not in (None, "", "0")]
     if authed:

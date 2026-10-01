@@ -47,16 +47,33 @@ def cmd_capture(args) -> int:
     url = args.url or f"https://{args.server or cfg.server}.herozerogame.com/"
     report = run_capture(url, headless=args.headless, timeout_minutes=args.timeout)
     session = merge_and_save(report, cfg.session_file, args.salt or "")
+    return _print_report(report, session, cfg)
+
+
+def _print_report(report, session: Session, cfg: Config) -> int:
     print(f"\nPrzechwycono żądań: {report.requests}")
     print(f"Endpoint:          {session.request_url}")
     print(f"Użytkownik:        {session.user_id} (sesja {'OK' if session.logged_in else 'BRAK'})")
     print(f"Sól podpisu:       {'znaleziona' if session.salt else 'NIE ZNALEZIONA'}")
-    print(f"Szablon logowania: {'tak' if report.login_captured else 'nie'}")
+    print(f"Szablon logowania: {'tak' if session.login_template else 'nie'}")
     print(f"Parametry stałe:   {', '.join(session.base_params) or '-'}")
     for note in report.notes:
         print(f"UWAGA: {note}")
     print(f"\nZapisano do {cfg.session_file}. Sprawdź nazwy akcji: python -m hzbot doctor")
     return 0 if session.salt and session.logged_in else 1
+
+
+def cmd_import(args) -> int:
+    from .capture import merge_and_save
+    from .har import import_har
+
+    cfg = _load(args)
+    data = Path(args.file).read_bytes()
+    report = import_har(data, fallback_page=f"https://{args.server or cfg.server}.herozerogame.com/")
+    session = merge_and_save(report, cfg.session_file, args.salt or "")
+    code = _print_report(report, session, cfg)
+    print(f"Plik {args.file} zawiera Twoje hasło i sesję - usuń go teraz.")
+    return code
 
 
 def cmd_doctor(args) -> int:
@@ -202,6 +219,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--headless", action="store_true")
     s.add_argument("--timeout", type=float, default=20, help="minuty oczekiwania (domyślnie 20)")
     s.set_defaults(func=cmd_capture)
+
+    s = sub.add_parser("import", help="połącz z grą z pliku HAR zapisanego w Twojej przeglądarce")
+    s.add_argument("file", help="plik .har")
+    s.add_argument("--server", help="np. pl1 (do pobrania skryptów gry, gdy HAR ich nie zawiera)")
+    s.add_argument("--salt", help="ręcznie podana sól podpisu")
+    s.set_defaults(func=cmd_import)
 
     s = sub.add_parser("doctor", help="sprawdź konfigurację i nazwy akcji")
     s.add_argument("--ping", action="store_true", help="wyślij testowe zapytanie synchronizacji")
