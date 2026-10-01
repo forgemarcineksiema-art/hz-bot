@@ -116,6 +116,7 @@ h3 { margin: 0 0 4px; font-size: 16px; }
 .num { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-weight: 800; color: var(--muted); }
 .step.done .num { background: var(--ok-bg); color: var(--ok); }
 .step .body { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+#step2 .callout { margin-top: 12px; }
 .howto { margin-top: 12px; background: var(--surface-2); border-radius: 12px; padding: 14px 16px; }
 .howto-title { font-weight: 700; display: flex; gap: 8px; align-items: center; }
 .howto ol { margin: 8px 0 12px; padding-left: 20px; }
@@ -234,33 +235,45 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
           <div class="step" id="step2">
             <div class="num">2</div>
             <div>
-              <h3>Połącz z grą</h3>
-              <div class="muted small">Bot musi raz podejrzeć, jak Twoja przeglądarka rozmawia z grą. Zajmuje to ok. 2 minuty.</div>
-              <div class="howto">
-                <div class="howto-title">Przez Twoją przeglądarkę <span class="chip ok">zalecane</span></div>
-                <ol class="small">
-                  <li>Otwórz <a id="gameLink" target="_blank" rel="noopener">grę</a> w swojej zwykłej przeglądarce (Chrome, Edge, Firefox).</li>
-                  <li>Naciśnij <kbd>F12</kbd>, przejdź do zakładki <b>Sieć</b> (<i>Network</i>), zaznacz <b>Zachowaj log</b> (<i>Preserve log</i>) i odśwież stronę klawiszem <kbd>F5</kbd>.</li>
-                  <li>Zaloguj się – captcha „Nie jestem robotem” zadziała normalnie. Rozpocznij i odbierz misję, stocz pojedynek.</li>
-                  <li>W zakładce Sieć kliknij ikonę pobierania <b>Eksportuj HAR</b> (<i>Export HAR</i>) albo prawym przyciskiem na liście → <b>Zapisz wszystko jako HAR</b>.</li>
-                  <li>Wskaż zapisany plik tutaj:</li>
-                </ol>
-                <label class="drop" id="drop">
-                  <input type="file" id="harFile" accept=".har,application/json" hidden>
-                  <span><b>Wybierz plik .har</b> albo przeciągnij go tutaj</span>
-                </label>
-                <div class="muted small" style="margin-top:6px">Plik zawiera Twoje hasło i sesję. Bot go nie zapisuje – po imporcie usuń go z dysku.</div>
+              <div class="body">
+                <div><h3>Połącz z grą</h3><div class="muted small">Otworzy się <b>Twój Chrome lub Edge</b> (osobny profil). Logujesz się sam – captcha „Nie jestem robotem” działa normalnie, bo bot nie jest wtedy podłączony do przeglądarki.</div></div>
+                <button class="btn primary" id="ownBtn">Otwórz grę</button>
               </div>
-              <details class="small" style="margin-top:10px">
-                <summary>Albo automatycznie, w oknie przeglądarki bota</summary>
-                <p class="muted" style="margin-top:0">Bot otworzy własne okno z grą. Google rozpoznaje takie okno jako sterowane automatycznie, więc captcha „Nie jestem robotem” może się w nim nie zaliczyć – wtedy użyj sposobu powyżej.</p>
-                <button class="btn" id="captureBtn">Otwórz grę w oknie bota</button>
+              <div class="callout info hidden" id="capStarting">Uruchamiam przeglądarkę…</div>
+              <div class="callout info hidden" id="capLogin">
+                <b>1/2 · Zaloguj się w otwartym oknie przeglądarki.</b> Bot jeszcze nic nie nagrywa.
+                Gdy zobaczysz swoją postać w grze, kliknij:
+                <div class="controls" style="margin-top:10px"><button class="btn primary" id="loggedInBtn">Zalogowałem się</button><button class="btn" data-cancel>Anuluj</button></div>
+              </div>
+              <div class="callout info hidden" id="capPlay">
+                <b>2/2 · Nagrywam ruch gry.</b> Rozpocznij i odbierz misję, stocz pojedynek (opcjonalnie: praca).
+                Potem kliknij – okno przeglądarki zostanie zamknięte:
+                <div class="controls" style="margin-top:10px"><button class="btn primary" id="captureDone">Gotowe</button></div>
+              </div>
+              <details class="small" id="otherWays" style="margin-top:12px">
+                <summary>Inne sposoby połączenia</summary>
+                <div class="howto">
+                  <div class="howto-title">Import pliku HAR z dowolnej przeglądarki</div>
+                  <ol class="small">
+                    <li>Otwórz <a id="gameLink" target="_blank" rel="noopener">grę</a> w swojej przeglądarce.</li>
+                    <li>Naciśnij <kbd>F12</kbd>, przejdź do zakładki <b>Sieć</b> (<i>Network</i>), zaznacz <b>Zachowaj log</b> (<i>Preserve log</i>) i odśwież stronę klawiszem <kbd>F5</kbd>.</li>
+                    <li>Zaloguj się, rozpocznij i odbierz misję, stocz pojedynek.</li>
+                    <li>W zakładce Sieć kliknij <b>Eksportuj HAR</b> (<i>Export HAR</i>) albo prawym przyciskiem → <b>Zapisz wszystko jako HAR</b>.</li>
+                    <li>Wskaż zapisany plik tutaj:</li>
+                  </ol>
+                  <label class="drop" id="drop">
+                    <input type="file" id="harFile" accept=".har,application/json" hidden>
+                    <span><b>Wybierz plik .har</b> albo przeciągnij go tutaj</span>
+                  </label>
+                  <div class="muted small" style="margin-top:6px">Plik zawiera Twoje hasło i sesję. Bot go nie zapisuje – po imporcie usuń go z dysku.</div>
+                </div>
+                <div class="howto">
+                  <div class="howto-title">Okno przeglądarki sterowane przez bota</div>
+                  <p class="muted" style="margin:6px 0 10px">Działa bez Chrome/Edge, ale takie okno jest oznaczone jako zautomatyzowane, więc captcha może się w nim nie zaliczyć.</p>
+                  <button class="btn" id="captureBtn">Otwórz okno bota</button>
+                </div>
               </details>
             </div>
-          </div>
-          <div class="callout info hidden" id="captureActive">
-            <b>Przeglądarka jest otwarta.</b> Zaloguj się, rozpocznij i odbierz misję, stocz pojedynek (opcjonalnie: praca).
-            Potem wróć tutaj i kliknij <button class="btn primary" id="captureDone" style="margin-left:6px">Gotowe</button>
           </div>
           <div class="callout hidden" id="captureResult"></div>
           <div class="step" id="step3">
@@ -427,7 +440,10 @@ document.querySelectorAll("#kindSeg button").forEach((b) => b.onclick = () => {
 $("startBtn").onclick = () => act(() => api("/api/start", { kind, speed: Number($("speed").value) }));
 $("stopBtn").onclick = () => act(() => api("/api/stop", {}), "Bot zatrzymany");
 let forceSetup = false, importing = false;
-$("captureBtn").onclick = () => act(() => api("/api/capture/start", {}), "Otwieram przeglądarkę…");
+$("ownBtn").onclick = () => act(() => api("/api/capture/start", { method: "own" }));
+$("captureBtn").onclick = () => act(() => api("/api/capture/start", { method: "bot" }), "Otwieram okno bota…");
+$("loggedInBtn").onclick = () => act(() => api("/api/capture/logged_in", {}), "Nagrywam ruch gry");
+document.querySelectorAll("[data-cancel]").forEach((b) => b.onclick = () => act(() => api("/api/capture/finish", {})));
 $("recaptureBtn").onclick = () => {
   forceSetup = true;
   document.querySelector('nav button[data-tab="panel"]').click();
@@ -504,8 +520,11 @@ function render() {
   $("step1").classList.toggle("done", setup.config_exists);
   $("step2").classList.toggle("done", setup.ready);
   if (document.activeElement !== $("setupServer")) $("setupServer").value = setup.server || "";
-  $("captureActive").classList.toggle("hidden", !capActive);
-  $("captureBtn").disabled = s.mode !== "stopped";
+  const phase = capActive ? s.capture.phase : null;
+  $("capStarting").classList.toggle("hidden", phase !== "starting");
+  $("capLogin").classList.toggle("hidden", phase !== "login");
+  $("capPlay").classList.toggle("hidden", phase !== "play");
+  $("captureBtn").disabled = $("ownBtn").disabled = s.mode !== "stopped";
   $("drop").classList.toggle("busy", s.mode !== "stopped" || importing);
   const cr = $("captureResult"), c = s.capture;
   if (c && !c.active) {
@@ -523,7 +542,9 @@ function render() {
   // now
   if (!b) {
     $("activity").textContent = s.mode === "capture" ? "Łączenie z grą…" : "Bot zatrzymany";
-    $("activitySub").textContent = s.mode === "capture" ? "Dokończ logowanie w przeglądarce." : "Wybierz tryb i kliknij Start.";
+    const capPhase = s.capture && s.capture.phase;
+    $("activitySub").textContent = s.mode !== "capture" ? "Wybierz tryb i kliknij Start."
+      : capPhase === "play" ? "Nagrywam ruch gry – zagraj chwilę i kliknij Gotowe." : "Zaloguj się w oknie przeglądarki.";
     $("timerBox").classList.add("hidden");
   } else {
     $("activity").textContent = running ? b.activity : "Bot zatrzymany";

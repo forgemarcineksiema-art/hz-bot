@@ -77,6 +77,8 @@ class Controller:
         self.error: str | None = None
         self.last_snapshot: dict | None = None
         self._capture_done = threading.Event()
+        self._capture_login = threading.Event()
+        self.browser_args: tuple[str, ...] = ()  # extra flags for the user's browser (tests)
         self.capture_result: dict | None = None
 
     # --- config ----------------------------------------------------------
@@ -210,22 +212,37 @@ class Controller:
 
     # --- capture / diagnostics ---------------------------------------------
 
-    def start_capture(self) -> None:
+    def start_capture(self, method: str = "own") -> None:
+        """method: "own" = user's Chrome/Edge (captcha-friendly), "bot" = Playwright window."""
+        if method not in ("own", "bot"):
+            raise ValueError("nieznana metoda łączenia")
         with self._lock:
             if self.mode != "stopped":
                 raise ValueError("Zatrzymaj bota przed łączeniem z grą.")
             self.mode, self.error = "capture", None
-            self.capture_result = {"active": True}
+            self.capture_result = {"active": True, "method": method,
+                                   "phase": "starting" if method == "own" else "play"}
+            self._capture_login.clear()
             self._capture_done.clear()
-            threading.Thread(target=self._capture, args=(self.config(),), daemon=True).start()
+            threading.Thread(target=self._capture, args=(self.config(), method), daemon=True).start()
 
-    def _capture(self, cfg: Config) -> None:
-        from .capture import merge_and_save, run_capture
+    def _set_phase(self, phase: str) -> None:
+        if self.capture_result and self.capture_result.get("active"):
+            self.capture_result = {**self.capture_result, "phase": phase}
+
+    def _capture(self, cfg: Config, method: str) -> None:
+        from .capture import merge_and_save, run_capture, run_capture_own_browser
 
         try:
             url = f"https://{cfg.server}.herozerogame.com/"
             log.info("Otwieram grę w przeglądarce: %s", url)
-            report = run_capture(url, timeout_minutes=30, done=self._capture_done)
+            if method == "own":
+                report = run_capture_own_browser(
+                    url, self._capture_login, self._capture_done, on_phase=self._set_phase,
+                    extra_args=self.browser_args,
+                )
+            else:
+                report = run_capture(url, timeout_minutes=30, done=self._capture_done)
             session = merge_and_save(report, cfg.session_file)
             self.capture_result = {
                 "active": False, "requests": report.requests, "salt": bool(session.salt),
@@ -263,7 +280,11 @@ class Controller:
         finally:
             self.mode = "stopped"
 
+    def confirm_login(self) -> None:
+        self._capture_login.set()
+
     def finish_capture(self) -> None:
+        self._capture_login.set()  # also cancels a capture still waiting for login
         self._capture_done.set()
 
     def doctor(self) -> dict:
@@ -371,7 +392,9 @@ def make_handler(ctrl: Controller, allowed_hosts: set[str] | None):
                 elif path == "/api/config":
                     ctrl.save_config(body.get("config") or {})
                 elif path == "/api/capture/start":
-                    ctrl.start_capture()
+                    ctrl.start_capture(str(body.get("method", "own")))
+                elif path == "/api/capture/logged_in":
+                    ctrl.confirm_login()
                 elif path == "/api/capture/finish":
                     ctrl.finish_capture()
                 elif path == "/api/ping":

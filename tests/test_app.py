@@ -109,7 +109,7 @@ def test_capture_from_panel(ctrl, monkeypatch, tmp_path):
         return analyze(url + "request.php", forms, [f'x="{salt}"'])
 
     monkeypatch.setattr("hzbot.capture.run_capture", fake_capture)
-    ctrl.start_capture()
+    ctrl.start_capture("bot")
     assert ctrl.status()["mode"] == "capture"
     ctrl.finish_capture()
     for _ in range(50):
@@ -138,3 +138,38 @@ def test_import_har_over_http(server, ctrl, tmp_path, monkeypatch):
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(req, timeout=5)
     assert e.value.code == 400
+
+
+def test_capture_in_own_browser_has_login_phase(ctrl, monkeypatch, tmp_path):
+    salt = "s3cr3tSalt"
+    forms = [{"action": "syncGame", "user_id": "9", "user_session_id": "abc",
+              "auth": make_auth("syncGame", "9", salt)}]
+    seen = []
+
+    def fake_own(url, logged_in, done, on_phase, extra_args, **kw):
+        on_phase("login")
+        seen.append(ctrl.status()["capture"]["phase"])
+        assert logged_in.wait(5)  # nothing may be recorded before the user confirms the login
+        on_phase("play")
+        seen.append(ctrl.status()["capture"]["phase"])
+        assert done.wait(5)
+        return analyze(url + "request.php", forms, [f'x="{salt}"'])
+
+    monkeypatch.setattr("hzbot.capture.run_capture_own_browser", fake_own)
+    ctrl.start_capture("own")
+    for _ in range(50):
+        if seen:
+            break
+        time.sleep(0.05)
+    ctrl.confirm_login()
+    for _ in range(50):
+        if len(seen) == 2:
+            break
+        time.sleep(0.05)
+    ctrl.finish_capture()
+    for _ in range(50):
+        if ctrl.mode == "stopped":
+            break
+        time.sleep(0.05)
+    assert seen == ["login", "play"]
+    assert ctrl.capture_result["salt"] and ctrl.setup_state()["ready"]

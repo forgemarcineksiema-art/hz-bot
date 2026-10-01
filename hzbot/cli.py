@@ -41,11 +41,34 @@ def _load_session(cfg: Config) -> Session:
 
 
 def cmd_capture(args) -> int:
-    from .capture import merge_and_save, run_capture
+    import threading
+
+    from .capture import merge_and_save, run_capture, run_capture_own_browser
 
     cfg = _load(args)
     url = args.url or f"https://{args.server or cfg.server}.herozerogame.com/"
-    report = run_capture(url, headless=args.headless, timeout_minutes=args.timeout)
+    if args.bot_browser:
+        report = run_capture(url, headless=args.headless, timeout_minutes=args.timeout)
+    else:
+        logged_in, done = threading.Event(), threading.Event()
+
+        def on_phase(phase: str) -> None:
+            if phase == "login":
+                print("\nOtworzyło się okno Twojej przeglądarki. Zaloguj się do gry - captcha działa\n"
+                      "normalnie, bot w tym czasie nie jest z nią połączony.\n"
+                      "Gdy zobaczysz grę, wróć tutaj i naciśnij Enter.")
+            elif phase == "play":
+                print("\nNagrywam ruch gry. Rozpocznij i odbierz misję, stocz pojedynek,\n"
+                      "potem wróć tutaj i naciśnij Enter.")
+
+        def keyboard() -> None:
+            for event in (logged_in, done):
+                if not sys.stdin.readline():
+                    return
+                event.set()
+
+        threading.Thread(target=keyboard, daemon=True).start()
+        report = run_capture_own_browser(url, logged_in, done, timeout_minutes=args.timeout, on_phase=on_phase)
     session = merge_and_save(report, cfg.session_file, args.salt or "")
     return _print_report(report, session, cfg)
 
@@ -216,8 +239,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--server", help="np. pl1, de3, us1 (nadpisuje config)")
     s.add_argument("--url", help="pełny adres strony gry (zamiast --server)")
     s.add_argument("--salt", help="ręcznie podana sól podpisu")
-    s.add_argument("--headless", action="store_true")
-    s.add_argument("--timeout", type=float, default=20, help="minuty oczekiwania (domyślnie 20)")
+    s.add_argument("--bot-browser", action="store_true",
+                   help="okno przeglądarki sterowane przez bota (captcha może nie działać)")
+    s.add_argument("--headless", action="store_true", help="tylko z --bot-browser")
+    s.add_argument("--timeout", type=float, default=30, help="minuty oczekiwania (domyślnie 30)")
     s.set_defaults(func=cmd_capture)
 
     s = sub.add_parser("import", help="połącz z grą z pliku HAR zapisanego w Twojej przeglądarce")

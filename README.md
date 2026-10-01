@@ -40,23 +40,29 @@ dlatego bot **nie ma ich na sztywno**. Zamiast tego komenda `capture`:
 
 ### Łączenie z grą (captcha „Nie jestem robotem”)
 
-Bot musi raz podejrzeć ruch prawdziwej gry. Zalecany sposób działa w Twojej **zwykłej
-przeglądarce**, więc captcha zachowuje się normalnie:
+Bot musi raz podejrzeć ruch prawdziwej gry. Kliknij **Otwórz grę** w panelu:
 
-1. Otwórz grę (np. `https://pl1.herozerogame.com`) w Chrome, Edge albo Firefoksie.
-2. Naciśnij `F12` → zakładka **Sieć** (*Network*) → zaznacz **Zachowaj log** (*Preserve log*)
-   → odśwież stronę (`F5`).
-3. Zaloguj się, rozpocznij i odbierz misję, stocz pojedynek.
-4. W zakładce Sieć kliknij **Eksportuj HAR** (*Export HAR*, ikona pobierania) albo prawym
-   przyciskiem → **Zapisz wszystko jako HAR**.
-5. Przeciągnij plik `.har` do panelu (albo: `python -m hzbot import plik.har`).
-6. Usuń plik `.har` – zawiera Twoje hasło i sesję.
+1. Bot uruchamia **Twojego Chrome'a lub Edge** jako zwykły program, z osobnym profilem
+   (`~/.hzbot/browser-profile`). Profil zapamiętuje logowanie na kolejne razy.
+2. Logujesz się sam. Captcha działa normalnie, bo w tym czasie bot **nie jest podłączony**
+   do przeglądarki i nie jest ona oznaczona jako sterowana automatycznie.
+3. Klikasz **Zalogowałem się**. Dopiero wtedy bot podłącza się do przeglądarki tak jak
+   narzędzia deweloperskie (F12) i nagrywa ruch gry.
+4. Rozpoczynasz i odbierasz misję, stoczysz pojedynek, klikasz **Gotowe**. Okno się zamyka.
 
-Sposób automatyczny („Otwórz grę w oknie bota”) otwiera osobne okno sterowane przez bota.
-Google rozpoznaje takie okno, więc captcha może się w nim nie zaliczyć.
+W terminalu to samo robi `python -m hzbot capture --server pl1`, a kolejne etapy
+potwierdzasz klawiszem Enter.
+
+Inne sposoby (w panelu: „Inne sposoby połączenia”):
+- **Import pliku HAR.** W dowolnej przeglądarce: `F12` → **Sieć** → **Zachowaj log** → `F5`
+  → zaloguj się i zagraj chwilę → **Eksportuj HAR**. Potem przeciągnij plik do panelu
+  (albo `python -m hzbot import plik.har`) i usuń go, bo zawiera hasło i sesję.
+- **Okno sterowane przez bota** (`capture --bot-browser`). Nie wymaga Chrome/Edge, ale jest
+  oznaczone jako zautomatyzowane, więc captcha może się w nim nie zaliczyć.
 
 Jeśli gra wymaga captcha przy logowaniu, bot nie zaloguje się sam po wygaśnięciu sesji.
-Wtedy zatrzyma się z komunikatem i trzeba powtórzyć import.
+Wtedy zatrzyma się z komunikatem i trzeba ponownie połączyć go z grą (zwykle wystarczy
+**Otwórz grę** → **Zalogowałem się** → **Gotowe**, bo profil przeglądarki pamięta logowanie).
 
 Panel pokazuje na żywo:
 - co bot teraz robi, z odliczaniem do końca misji lub pracy,
@@ -86,7 +92,7 @@ Wszystko, co robi panel, jest też dostępne z terminala:
 ```bash
 cp config.example.yaml config.yaml                   # i ustaw swój serwer (np. pl1)
 python -m hzbot import zapis.har                     # połączenie z grą z pliku HAR
-python -m hzbot capture --server pl1                 # albo: okno przeglądarki bota (Enter kończy)
+python -m hzbot capture --server pl1                 # albo: Twoja przeglądarka (Enter po każdym etapie)
 python -m hzbot doctor --ping                        # diagnostyka
 python -m hzbot run --dry-run                        # na sucho
 python -m hzbot run                                  # gra
