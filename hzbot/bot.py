@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
+import threading
 import time
 from collections import Counter
 
@@ -66,10 +67,59 @@ class Bot:
         self._cooldown: dict[str, float] = {}
         self._started_at: dict[str, float] = {}  # quest/work id -> local start time
 
+        # Read by the GUI from another thread.
+        self.lock = threading.RLock()
+        self.activity = "Uruchamianie"
+        self.next_wake_at: float | None = None
+        self._baseline: dict | None = None  # character values when the bot started
+
     # --- plumbing --------------------------------------------------------
 
     def _on_data(self, data: dict) -> None:
-        self.state.apply(data, self.clock.now())
+        with self.lock:
+            self.state.apply(data, self.clock.now())
+            c = self.state.character
+            if self._baseline is None and "xp" in c:
+                self._baseline = {k: num(c, k) for k in ("xp", "game_currency", "honor")}
+
+    def snapshot(self) -> dict:
+        """Thread-safe summary of the bot and character for the GUI."""
+        with self.lock:
+            now = self.clock.now()
+            c = dict(self.state.character)
+
+            def timer(item: dict | None, kind: str) -> dict | None:
+                if item is None:
+                    return None
+                remaining = max(0.0, self._remaining(item, kind))
+                duration = num(item, "duration") or (num(item, "hours") * 3600)
+                return {"id": str(item.get("id", "")), "remaining": remaining, "duration": duration}
+
+            return {
+                "time": now,
+                "activity": self.activity,
+                "next_wake_in": max(0.0, self.next_wake_at - now) if self.next_wake_at else None,
+                "character": {
+                    "name": c.get("name", ""),
+                    "level": c.get("level"),
+                    "xp": c.get("xp"),
+                    "coins": c.get("game_currency"),
+                    "premium": c.get("premium_currency"),
+                    "honor": c.get("honor"),
+                    "quest_energy": c.get("quest_energy"),
+                    "max_quest_energy": c.get("max_quest_energy"),
+                    "duel_stamina": c.get("duel_stamina"),
+                    "max_duel_stamina": c.get("max_duel_stamina"),
+                },
+                "quest": timer(self.state.active_quest, "quest"),
+                "work": timer(self.state.active_work, "work"),
+                "gained": {
+                    k: num(c, k) - v for k, v in (self._baseline or {}).items()
+                },
+                "duels_today": self._duels_today,
+                "duels_max": self.cfg.duels.max_per_day,
+                "stats": dict(self.stats),
+            }
 
     def _pause(self) -> float:
         b = self.cfg.behaviour
@@ -154,6 +204,7 @@ class Bot:
                 break
             if deadline is not None:
                 wait = min(wait, max(0.0, deadline - self.clock.now()))
+            self.next_wake_at = self.clock.now() + wait
             self.clock.sleep(wait)
         return self.stats
 
@@ -162,6 +213,7 @@ class Bot:
         now = self.clock.now()
         off = seconds_until_active(now, self.window)
         if off > 0:
+            self.activity = "Poza godzinami aktywności"
             log.info("Poza godzinami aktywności - pauza %.0f min", off / 60)
             return off + self.rng.uniform(30, 300)
 
@@ -175,6 +227,7 @@ class Bot:
             if remaining > 0:
                 if self.cfg.duels.during_quest and self._can_duel():
                     return self._duel()
+                self.activity = "Misja w toku"
                 return remaining + self.rng.uniform(2, 15)
             return self._finish_quest(quest)
 
@@ -182,6 +235,7 @@ class Bot:
         if work is not None:
             remaining = self._remaining(work, "work")
             if remaining > 0:
+                self.activity = "Praca w toku"
                 return remaining + self.rng.uniform(5, 60)
             return self._finish_work()
 
@@ -195,6 +249,7 @@ class Bot:
             return self._start_work()
 
         idle = self.cfg.behaviour.idle_poll_minutes * 60
+        self.activity = "Brak energii i kondycji - czekam"
         self._invalidate()  # fetch fresh energy/stamina after the idle period
         return idle * self.rng.uniform(0.8, 1.2)
 
@@ -228,6 +283,7 @@ class Bot:
             "Misja %s: %.0f min, energia %.0f, XP %.0f, monety %.0f",
             opt.id, opt.duration / 60, opt.energy, opt.xp, opt.coins,
         )
+        self.activity = "Rozpoczynam misję"
         self._act("start_quest", {self.cfg.params.quest_id: opt.id})
         self.stats["quests_started"] += 1
         self._started_at[f"quest:{opt.id}"] = self.clock.now()
@@ -242,6 +298,7 @@ class Bot:
         if self.cfg.actions.check_quest:
             self._act("check_quest", params)
             self.clock.sleep(self._pause())
+        self.activity = "Odbieram nagrodę za misję"
         self._act("claim_quest", params)
         self.stats["quests_completed"] += 1
         self._started_at.pop(f"quest:{qid}", None)
@@ -271,6 +328,7 @@ class Bot:
             return self._pause()
         oid = str(opp["id"])
         log.info("Pojedynek z %s (poziom %s)", opp.get("name", oid), opp.get("level", "?"))
+        self.activity = f"Pojedynek z {opp.get('name', oid)}"
         self.state.last_duel = {}
         self._act("start_duel", {self.cfg.params.character_id: oid})
         if self.cfg.actions.check_duel:
@@ -295,6 +353,7 @@ class Bot:
 
     def _start_work(self) -> float:
         hours = self.cfg.work.hours
+        self.activity = "Idę do pracy"
         log.info("Praca na %d h", hours)
         self._act("start_work", {self.cfg.params.hours: hours})
         self.stats["work_started"] += 1

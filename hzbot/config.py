@@ -124,3 +124,29 @@ def load_config(path: str | Path | None) -> Config:
     cfg.email = os.environ.get("HZ_EMAIL", cfg.email)
     cfg.password = os.environ.get("HZ_PASSWORD", cfg.password)
     return cfg
+
+
+def config_from_dict(data: dict[str, Any]) -> Config:
+    """Validate a raw (YAML-shaped) dictionary. Raises ValueError with a readable path."""
+    return _build(Config, data, "config")
+
+
+def read_raw_config(path: str | Path) -> dict[str, Any]:
+    p = Path(path)
+    if not p.exists():
+        return {}
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        raise ValueError(f"{p}: oczekiwano słownika YAML")
+    return data
+
+
+def write_raw_config(path: str | Path, data: dict[str, Any]) -> None:
+    config_from_dict(data)  # never write an invalid file
+    p = Path(path)
+    p.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    if data.get("password"):
+        try:
+            os.chmod(p, 0o600)
+        except OSError:
+            pass

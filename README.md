@@ -22,46 +22,66 @@ dlatego bot **nie ma ich na sztywno**. Zamiast tego komenda `capture`:
 4. zapisuje sesję, stałe parametry (np. `client_version`), szablon logowania (bez hasła!)
    i listę zaobserwowanych akcji do `session.json`.
 
-## Instalacja
+## Szybki start (panel w przeglądarce)
 
-Wymagany Python 3.10+.
+![Panel HZ Bot](docs/panel.png)
+
+1. Zainstaluj [Pythona 3.10+](https://www.python.org/downloads/) (na Windows zaznacz „Add to PATH”).
+2. Pobierz projekt i uruchom:
+   - **Windows:** kliknij dwukrotnie `start.bat`
+   - **Linux/macOS:** `./start.sh`
+
+   Za pierwszym razem skrypt sam zainstaluje wszystko, czego potrzeba. Potem otworzy się panel
+   pod adresem <http://127.0.0.1:8777>.
+3. W panelu przejdź trzy kroki z karty **Pierwsze uruchomienie**:
+   1. wpisz serwer (np. `pl1`),
+   2. kliknij **Otwórz grę i połącz** – zaloguj się w przeglądarce, rozpocznij i odbierz misję,
+      stocz pojedynek, potem kliknij **Gotowe**,
+   3. wybierz tryb **Na sucho** (bot tylko pokazuje decyzje) albo **Gra** i kliknij **Start**.
+
+Panel pokazuje na żywo:
+- co bot teraz robi, z odliczaniem do końca misji lub pracy,
+- energię misji i kondycję, poziom, XP, monety i honor,
+- statystyki sesji: misje, pojedynki (wygrane/przegrane), XP i monety zdobyte od startu,
+- dziennik zdarzeń.
+
+W zakładce **Ustawienia** zmienisz strategie, limity i godziny gry bez edytowania plików.
+**Diagnostyka** pokazuje, czy nazwy akcji zgadzają się z tym, co wysyła gra, i pozwala
+przetestować połączenie. Tryb **Symulacja** pozwala obejrzeć bota w akcji na wbudowanym
+symulatorze (do ×1200 szybciej), bez łączenia z grą.
+
+Panel działa tylko na Twoim komputerze (127.0.0.1). Inne strony internetowe nie mogą nim
+sterować.
+
+## Instalacja ręczna i wiersz poleceń
 
 ```bash
-git clone <repo> hz-bot && cd hz-bot
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -e ".[capture]"
 playwright install chromium
-cp config.example.yaml config.yaml                   # i ustaw swój serwer (np. pl1)
+python -m hzbot                                      # panel (to samo co: python -m hzbot app)
 ```
 
-## Użycie
+Wszystko, co robi panel, jest też dostępne z terminala:
 
 ```bash
-# 1. Zaloguj się w oknie przeglądarki i zagraj chwilę: rozpocznij i odbierz misję,
-#    stocz pojedynek, ewentualnie pracę. Potem naciśnij Enter w terminalu.
-python -m hzbot capture --server pl1
-
-# 2. Sprawdź, czy nazwy akcji z config.yaml zgadzają się z tym, co wysyła gra.
-python -m hzbot doctor --ping
-
-# 3. Najpierw na sucho - bot tylko loguje, co by zrobił.
-python -m hzbot run --dry-run
-
-# 4. Gramy!
-python -m hzbot run
+cp config.example.yaml config.yaml                   # i ustaw swój serwer (np. pl1)
+python -m hzbot capture --server pl1                 # połączenie z grą (Enter kończy)
+python -m hzbot doctor --ping                        # diagnostyka
+python -m hzbot run --dry-run                        # na sucho
+python -m hzbot run                                  # gra
 ```
-
-Pozostałe komendy:
 
 | Komenda | Opis |
 | --- | --- |
-| `simulate --hours 24` | uruchamia bota na wbudowanym symulatorze gry (bez łączenia z Hero Zero) — dobre do testów strategii |
+| `app [--port 8777] [--no-browser]` | panel w przeglądarce (domyślna komenda) |
+| `simulate --hours 24` | bot na symulatorze, wynik w terminalu |
 | `call AKCJA k=v …` | wysyła pojedynczą akcję i wypisuje odpowiedź (debugowanie) |
 | `login` | loguje ponownie e-mailem/hasłem z konfiguracji (`HZ_EMAIL`, `HZ_PASSWORD`) |
 
-Jeśli `doctor` pokazuje `??` przy jakiejś akcji, wykonaj ją ręcznie w grze podczas kolejnego
-`capture` (wyniki z wielu przechwyceń są łączone) albo popraw nazwę w sekcji `actions:` w
-`config.yaml` — `doctor` wypisuje też wszystkie inne akcje zaobserwowane w ruchu gry.
+Jeśli diagnostyka pokazuje „Nie widziano” przy jakiejś akcji, wykonaj ją ręcznie w grze podczas
+kolejnego łączenia (wyniki z wielu połączeń się sumują) albo popraw nazwę w Ustawienia →
+Zaawansowane (sekcja `actions:` w `config.yaml`).
 
 ## Co robi bot
 
@@ -97,6 +117,8 @@ hzbot/
   sim.py       symulator serwera gry (testy, `simulate`)
   config.py    konfiguracja YAML
   cli.py       komendy
+  app.py       serwer panelu (biblioteka standardowa)
+  web/         interfejs panelu (jeden plik HTML, bez zależności)
 tests/         pytest (w tym pełna doba gry na symulatorze)
 ```
 

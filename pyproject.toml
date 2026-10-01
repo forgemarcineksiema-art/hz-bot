@@ -20,5 +20,8 @@ hzbot = "hzbot.cli:main"
 [tool.setuptools]
 packages = ["hzbot"]
 
+[tool.setuptools.package-data]
+hzbot = ["web/*.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

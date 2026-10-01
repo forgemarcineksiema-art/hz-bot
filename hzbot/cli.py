@@ -4,13 +4,13 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__
 from .bot import Bot, BotStopped
 from .client import GameError, HeroZeroClient, TransportError
 from .config import Config, load_config
+from .diagnostics import DISABLED, OK, check_actions
 from .session import Session
 
 
@@ -41,20 +41,12 @@ def _load_session(cfg: Config) -> Session:
 
 
 def cmd_capture(args) -> int:
-    from .capture import run_capture
+    from .capture import merge_and_save, run_capture
 
     cfg = _load(args)
     url = args.url or f"https://{args.server or cfg.server}.herozerogame.com/"
     report = run_capture(url, headless=args.headless, timeout_minutes=args.timeout)
-    session = report.session
-    if args.salt:
-        session.salt = args.salt
-    previous = Path(cfg.session_file)
-    if previous.exists():  # keep actions observed in earlier captures
-        for action, names in Session.load(previous).observed_actions.items():
-            merged = set(names) | set(session.observed_actions.get(action, []))
-            session.observed_actions[action] = sorted(merged)
-    session.save(cfg.session_file)
+    session = merge_and_save(report, cfg.session_file, args.salt or "")
     print(f"\nPrzechwycono żądań: {report.requests}")
     print(f"Endpoint:          {session.request_url}")
     print(f"Użytkownik:        {session.user_id} (sesja {'OK' if session.logged_in else 'BRAK'})")
@@ -75,21 +67,20 @@ def cmd_doctor(args) -> int:
     print(f"Sesja:    {'zalogowano' if session.logged_in else 'brak'}; sól: {'jest' if session.salt else 'BRAK'}")
     if not session.salt:
         ok = False
-    observed = session.observed_actions
+    rows, extra = check_actions(cfg, session)
     print("\nAkcje skonfigurowane vs. zaobserwowane w ruchu gry:")
-    for name, action in asdict(cfg.actions).items():
-        if not action:
+    for r in rows:
+        if r["status"] == DISABLED:
             mark = "-  (wyłączona)"
-        elif action in observed:
-            mark = f"OK  parametry: {', '.join(observed[action]) or '-'}"
+        elif r["status"] == OK:
+            mark = f"OK  parametry: {', '.join(r['params']) or '-'}"
         else:
             mark = "??  nie zaobserwowano (wykonaj tę akcję w grze podczas capture, albo popraw nazwę)"
-        print(f"  {name:14} {action or '':26} {mark}")
-    unknown = sorted(set(observed) - set(asdict(cfg.actions).values()))
-    if unknown:
+        print(f"  {r['name']:14} {r['action']:26} {mark}")
+    if extra:
         print("\nInne akcje widziane w grze (przydatne do konfiguracji):")
-        for a in unknown:
-            print(f"  {a:30} {', '.join(observed[a])}")
+        for e in extra:
+            print(f"  {e['action']:30} {', '.join(e['params'])}")
     if args.ping:
         client = HeroZeroClient(session)
         try:
@@ -182,12 +173,27 @@ def cmd_simulate(args) -> int:
     return 0
 
 
+def cmd_app(args) -> int:
+    from .app import serve
+
+    serve(args.config or "config.yaml", host=args.host, port=args.port, open_browser=not args.no_browser)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="hzbot", description="Bot do automatycznej gry w Hero Zero")
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("-c", "--config", help="plik YAML (domyślnie config.yaml jeśli istnieje)")
     p.add_argument("-v", "--verbose", action="store_true")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    # No subcommand = open the panel.
+    p.set_defaults(func=cmd_app, cmd="app", host="127.0.0.1", port=8777, no_browser=False)
+    sub = p.add_subparsers(dest="cmd")
+
+    s = sub.add_parser("app", help="panel w przeglądarce (domyślnie)")
+    s.add_argument("--host", default="127.0.0.1", help="adres nasłuchu (domyślnie tylko ten komputer)")
+    s.add_argument("--port", type=int, default=8777)
+    s.add_argument("--no-browser", action="store_true", help="nie otwieraj przeglądarki automatycznie")
+    s.set_defaults(func=cmd_app)
 
     s = sub.add_parser("capture", help="zaloguj się w przeglądarce i przechwyć parametry protokołu")
     s.add_argument("--server", help="np. pl1, de3, us1 (nadpisuje config)")
@@ -224,7 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.cmd != "run" and args.cmd != "simulate":
+    if args.cmd not in ("run", "simulate", "app"):
         logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(message)s")
     try:
         return args.func(args)

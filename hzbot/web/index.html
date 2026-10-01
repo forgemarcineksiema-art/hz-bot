@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HZ Bot</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23f59e0b'/%3E%3Cpath d='M9 8h4v6h6V8h4v16h-4v-6h-6v6H9z' fill='%23111'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f0f1f4; --border: #e2e4e9;
+  --text: #16181d; --muted: #646b78; --accent: #d97706; --accent-ink: #ffffff;
+  --ok: #15803d; --ok-bg: #dcfce7; --warn: #b45309; --warn-bg: #fef3c7;
+  --bad: #b91c1c; --bad-bg: #fee2e2; --info: #1d4ed8; --info-bg: #dbeafe;
+  --bar-quest: #d97706; --bar-duel: #2563eb; --bar-track: #e7e9ee;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --radius: 14px; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --surface: #171a21; --surface-2: #1e222b; --border: #2a2f3a;
+    --text: #e8eaee; --muted: #9aa2b1; --accent: #f59e0b; --accent-ink: #111318;
+    --ok: #4ade80; --ok-bg: #12311f; --warn: #fbbf24; --warn-bg: #3a2c0c;
+    --bad: #f87171; --bad-bg: #3b1515; --info: #93b4ff; --info-bg: #17254a;
+    --bar-quest: #f59e0b; --bar-duel: #60a5fa; --bar-track: #262b35;
+    --shadow: none; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --surface: #171a21; --surface-2: #1e222b; --border: #2a2f3a;
+  --text: #e8eaee; --muted: #9aa2b1; --accent: #f59e0b; --accent-ink: #111318;
+  --ok: #4ade80; --ok-bg: #12311f; --warn: #fbbf24; --warn-bg: #3a2c0c;
+  --bad: #f87171; --bad-bg: #3b1515; --info: #93b4ff; --info-bg: #17254a;
+  --bar-quest: #f59e0b; --bar-duel: #60a5fa; --bar-track: #262b35;
+  --shadow: none; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* header */
+header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5; }
+.bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; margin-right: auto; }
+.logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #111; display: grid; place-items: center; font-weight: 800; }
+.server { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface-2); padding: 2px 8px; border-radius: 999px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.run { background: var(--ok-bg); color: var(--ok); }
+.pill.run .dot { animation: pulse 1.6s infinite; }
+.pill.sim { background: var(--info-bg); color: var(--info); }
+.pill.dry { background: var(--warn-bg); color: var(--warn); }
+.pill.err { background: var(--bad-bg); color: var(--bad); }
+@keyframes pulse { 50% { opacity: .35; } }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+.seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--muted); }
+.seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+.seg button:disabled { cursor: not-allowed; }
+.btn { border: 1px solid var(--border); background: var(--surface); padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; display: inline-flex; gap: 7px; align-items: center; }
+.btn:hover { background: var(--surface-2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.danger { background: #dc2626; border-color: transparent; color: #fff; }
+.btn.big { padding: 9px 20px; font-size: 15px; }
+select.small { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+nav { display: flex; gap: 4px; }
+nav button { border: 0; background: none; padding: 10px 14px; cursor: pointer; color: var(--muted); font-weight: 600; border-bottom: 2px solid transparent; }
+nav button.on { color: var(--text); border-bottom-color: var(--accent); }
+
+/* layout */
+main { padding: 20px 0 48px; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); min-width: 0; }
+.span-12 { grid-column: span 12; } .span-6 { grid-column: span 6; } .span-4 { grid-column: span 4; } .span-8 { grid-column: span 8; }
+@media (max-width: 860px) { .span-6, .span-4, .span-8 { grid-column: span 12; } }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; font-weight: 700; }
+h3 { margin: 0 0 4px; font-size: 16px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.hidden { display: none !important; }
+
+/* now card */
+.now { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.progress { height: 10px; border-radius: 999px; background: var(--bar-track); overflow: hidden; margin: 12px 0 6px; }
+.progress > div { height: 100%; background: var(--accent); border-radius: inherit; transition: width .9s linear; }
+.row { display: flex; justify-content: space-between; gap: 12px; }
+
+/* character */
+.char-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.lvl { min-width: 46px; height: 46px; padding: 0 6px; border-radius: 12px; background: var(--surface-2); display: grid; place-items: center; font-weight: 800; font-size: 18px; }
+.kv { display: grid; grid-template-columns: 1fr auto; row-gap: 8px; }
+.kv dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.kv dt { color: var(--muted); }
+.res { margin-bottom: 14px; }
+.res:last-child { margin-bottom: 0; }
+.res .row { font-size: 14px; }
+.res .row b { font-variant-numeric: tabular-nums; }
+.res .progress { margin: 6px 0 0; height: 8px; }
+.res.duel .progress > div { background: var(--bar-duel); }
+
+/* stats */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 520px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+.tile { background: var(--surface-2); border-radius: 10px; padding: 12px; }
+.tile .v { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 12px; color: var(--muted); }
+
+/* setup */
+.steps { display: grid; gap: 12px; }
+.step { display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: start; }
+.num { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-weight: 800; color: var(--muted); }
+.step.done .num { background: var(--ok-bg); color: var(--ok); }
+.step .body { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.callout { border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.callout.info { background: var(--info-bg); color: var(--info); }
+.callout.bad { background: var(--bad-bg); color: var(--bad); }
+.callout.warn { background: var(--warn-bg); color: var(--warn); }
+.callout.ok { background: var(--ok-bg); color: var(--ok); }
+
+/* log */
+.log { height: 300px; overflow: auto; background: var(--surface-2); border-radius: 10px; padding: 8px 10px; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.log div { white-space: pre-wrap; word-break: break-word; }
+.log .t { color: var(--muted); margin-right: 8px; }
+.log .WARNING { color: var(--warn); }
+.log .ERROR, .log .CRITICAL { color: var(--bad); }
+
+/* forms */
+.form-grid { columns: 2; column-gap: 16px; }
+.form-grid > .card { break-inside: avoid; margin-bottom: 16px; }
+.form-grid > .card.wide { column-span: all; }
+@media (max-width: 860px) { .form-grid { columns: 1; } }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.section-head h3 { font-size: 16px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.field .hint { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.field input[type=text], .field input[type=email], .field input[type=password], .field input[type=number], .field input[type=time], .field select {
+  width: 100%; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-bottom: 10px; cursor: pointer; }
+.check input { width: 17px; height: 17px; accent-color: var(--accent); }
+.switch { position: relative; width: 40px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--bar-track); cursor: pointer; transition: .2s; }
+.switch span::after { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(18px); }
+.disabled-body { opacity: .45; pointer-events: none; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+details summary { cursor: pointer; font-weight: 600; margin-bottom: 10px; }
+.savebar { position: sticky; bottom: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px; display: flex; gap: 12px; align-items: center; justify-content: space-between; margin-top: 16px; box-shadow: var(--shadow); flex-wrap: wrap; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.chip { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.unseen { background: var(--warn-bg); color: var(--warn); }
+.chip.disabled { background: var(--surface-2); color: var(--muted); }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+
+.toast { position: fixed; top: 84px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 20; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand"><div class="logo">H</div>HZ Bot <span class="server" id="server">—</span></div>
+      <span class="pill" id="pill"><span class="dot"></span><span id="pillText">Zatrzymany</span></span>
+      <div class="controls">
+        <div class="seg" id="kindSeg" role="radiogroup" aria-label="Tryb">
+          <button data-kind="game" class="on" title="Bot gra na Twoim koncie">Gra</button>
+          <button data-kind="dry" title="Bot tylko pokazuje, co by zrobił">Na sucho</button>
+          <button data-kind="sim" title="Symulator - bez łączenia z grą">Symulacja</button>
+        </div>
+        <select class="small hidden" id="speed" title="Przyspieszenie symulacji">
+          <option value="60">×60</option><option value="300" selected>×300</option><option value="1200">×1200</option><option value="1">×1</option>
+        </select>
+        <button class="btn primary big" id="startBtn">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor"/></svg>
+          Start
+        </button>
+        <button class="btn danger big hidden" id="stopBtn">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="currentColor"/></svg>
+          Stop
+        </button>
+      </div>
+    </div>
+    <nav>
+      <button data-tab="panel" class="on">Panel</button>
+      <button data-tab="settings">Ustawienia</button>
+      <button data-tab="diag">Diagnostyka</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- PANEL -->
+  <section id="tab-panel">
+    <div class="grid">
+      <div class="card span-12 hidden" id="errorCard"><div class="callout bad" id="errorText"></div></div>
+
+      <div class="card span-12 hidden" id="setupCard">
+        <h2>Pierwsze uruchomienie</h2>
+        <div class="steps">
+          <div class="step" id="step1">
+            <div class="num">1</div>
+            <div class="body">
+              <div><h3>Wybierz serwer</h3><div class="muted small">Np. <code>pl1</code> dla adresu pl1.herozerogame.com</div></div>
+              <div class="controls">
+                <input id="setupServer" type="text" placeholder="pl1" style="width:110px;padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--surface)">
+                <button class="btn" id="setupServerSave">Zapisz</button>
+              </div>
+            </div>
+          </div>
+          <div class="step" id="step2">
+            <div class="num">2</div>
+            <div class="body">
+              <div><h3>Połącz z grą</h3><div class="muted small">Otworzy się przeglądarka z grą. Zaloguj się i zagraj chwilę – bot nauczy się, jak rozmawiać z serwerem.</div></div>
+              <button class="btn primary" id="captureBtn">Otwórz grę i połącz</button>
+            </div>
+          </div>
+          <div class="callout info hidden" id="captureActive">
+            <b>Przeglądarka jest otwarta.</b> Zaloguj się, rozpocznij i odbierz misję, stocz pojedynek (opcjonalnie: praca).
+            Potem wróć tutaj i kliknij <button class="btn primary" id="captureDone" style="margin-left:6px">Gotowe</button>
+          </div>
+          <div class="callout hidden" id="captureResult"></div>
+          <div class="step" id="step3">
+            <div class="num">3</div>
+            <div class="body">
+              <div><h3>Uruchom bota</h3><div class="muted small">Zacznij od trybu <b>Na sucho</b>, żeby zobaczyć decyzje bota. Chcesz tylko popatrzeć? Wybierz <b>Symulacja</b>.</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card span-8" id="nowCard">
+        <h2>Teraz</h2>
+        <div class="now" id="activity">Bot zatrzymany</div>
+        <div class="muted" id="activitySub">Wybierz tryb i kliknij Start.</div>
+        <div id="timerBox" class="hidden">
+          <div class="progress"><div id="timerBar" style="width:0%"></div></div>
+          <div class="row small muted"><span id="timerLabel">Misja</span><span id="timerLeft">—</span></div>
+        </div>
+      </div>
+
+      <div class="card span-4">
+        <h2>Zasoby</h2>
+        <div class="res">
+          <div class="row"><span>Energia misji</span><b id="energyTxt">—</b></div>
+          <div class="progress"><div id="energyBar" style="width:0%;background:var(--bar-quest)"></div></div>
+        </div>
+        <div class="res duel">
+          <div class="row"><span>Kondycja (pojedynki)</span><b id="staminaTxt">—</b></div>
+          <div class="progress"><div id="staminaBar" style="width:0%"></div></div>
+        </div>
+      </div>
+
+      <div class="card span-4">
+        <h2>Postać</h2>
+        <div class="char-head">
+          <div class="lvl" id="lvl">–</div>
+          <div><div style="font-weight:700" id="charName">—</div><div class="muted small">poziom</div></div>
+        </div>
+        <dl class="kv" style="margin:0">
+          <dt>Doświadczenie</dt><dd id="xp">—</dd>
+          <dt>Monety</dt><dd id="coins">—</dd>
+          <dt>Honor</dt><dd id="honor">—</dd>
+        </dl>
+      </div>
+
+      <div class="card span-8">
+        <div class="row"><h2>Ta sesja</h2><span class="muted small" id="uptime"></span></div>
+        <div class="tiles">
+          <div class="tile"><div class="v" id="sQuests">0</div><div class="l">Misje ukończone</div></div>
+          <div class="tile"><div class="v" id="sDuels">0</div><div class="l" id="sDuelsL">Pojedynki</div></div>
+          <div class="tile"><div class="v" id="sWork">0</div><div class="l">Praca</div></div>
+          <div class="tile"><div class="v" id="sErrors">0</div><div class="l">Błędy</div></div>
+          <div class="tile"><div class="v" id="gXp">0</div><div class="l">Zdobyte XP</div></div>
+          <div class="tile"><div class="v" id="gCoins">0</div><div class="l">Zdobyte monety</div></div>
+          <div class="tile"><div class="v" id="gHonor">0</div><div class="l">Zmiana honoru</div></div>
+          <div class="tile"><div class="v" id="dToday">0</div><div class="l">Pojedynki dziś</div></div>
+        </div>
+      </div>
+
+      <div class="card span-12">
+        <div class="row" style="align-items:center;margin-bottom:10px;flex-wrap:wrap">
+          <h2 style="margin:0">Dziennik</h2>
+          <div class="controls small">
+            <label class="check" style="margin:0"><input type="checkbox" id="onlyImportant"> tylko ostrzeżenia i błędy</label>
+            <label class="check" style="margin:0"><input type="checkbox" id="autoscroll" checked> przewijaj</label>
+          </div>
+        </div>
+        <div class="log" id="log" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="tab-settings" class="hidden">
+    <div class="callout info" style="margin-bottom:16px">Zmiany zaczną działać po ponownym uruchomieniu bota. Plik: <code id="cfgPath"></code></div>
+    <form id="settingsForm" autocomplete="off" onsubmit="return false">
+      <div class="form-grid" id="formGrid"></div>
+      <div class="savebar">
+        <span class="muted small" id="saveState">Brak niezapisanych zmian</span>
+        <div class="controls">
+          <button type="button" class="btn" id="resetBtn">Cofnij zmiany</button>
+          <button type="button" class="btn primary" id="saveBtn">Zapisz ustawienia</button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <!-- DIAGNOSTICS -->
+  <section id="tab-diag" class="hidden">
+    <div class="grid">
+      <div class="card span-12">
+        <div class="row" style="align-items:center">
+          <h2 style="margin:0">Połączenie</h2>
+          <div class="controls">
+            <button class="btn" id="pingBtn">Test połączenia</button>
+            <button class="btn" id="recaptureBtn">Połącz ponownie</button>
+          </div>
+        </div>
+        <div id="diagSession" style="margin-top:12px"></div>
+      </div>
+      <div class="card span-12">
+        <h2>Akcje gry</h2>
+        <p class="muted small" style="margin-top:0">Porównanie nazw akcji z ustawień z tym, co wysyła prawdziwa gra. „Nie widziano” – wykonaj tę akcję w grze podczas łączenia albo popraw nazwę w Ustawienia → Zaawansowane.</p>
+        <div style="overflow-x:auto"><table id="diagTable"></table></div>
+        <div id="diagExtra"></div>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const fmt = new Intl.NumberFormat("pl-PL");
+const n = (v) => (v === null || v === undefined || v === "") ? "—" : fmt.format(Number(v));
+
+let status = null, statusAt = 0, kind = "game", logAfter = 0, logLines = [];
+let cfgOriginal = null, dirty = false;
+
+// ---------- api ----------
+async function api(path, body) {
+  const opt = body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json", "X-HZBot": "1" }, body: JSON.stringify(body),
+  };
+  const r = await fetch(path, opt);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 2600);
+}
+async function act(fn, okMsg) {
+  try { await fn(); if (okMsg) toast(okMsg); } catch (e) { toast(e.message); }
+  refresh();
+}
+
+// ---------- time ----------
+function dur(s) {
+  if (s === null || s === undefined || !isFinite(s)) return "—";
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  if (h) return `${h} h ${String(m).padStart(2, "0")} min`;
+  if (m) return `${m}:${String(sec).padStart(2, "0")} min`;
+  return `${sec} s`;
+}
+const clock = (t) => new Date(t * 1000).toLocaleTimeString("pl-PL");
+
+// ---------- tabs & mode ----------
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  for (const t of ["panel", "settings", "diag"]) $("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab);
+  if (b.dataset.tab === "settings" && !dirty) loadConfig();
+  if (b.dataset.tab === "diag") loadDoctor();
+});
+document.querySelectorAll("#kindSeg button").forEach((b) => b.onclick = () => {
+  kind = b.dataset.kind;
+  document.querySelectorAll("#kindSeg button").forEach((x) => x.classList.toggle("on", x === b));
+  $("speed").classList.toggle("hidden", kind !== "sim");
+});
+$("startBtn").onclick = () => act(() => api("/api/start", { kind, speed: Number($("speed").value) }));
+$("stopBtn").onclick = () => act(() => api("/api/stop", {}), "Bot zatrzymany");
+$("captureBtn").onclick = $("recaptureBtn").onclick = () => {
+  document.querySelector('nav button[data-tab="panel"]').click();
+  act(() => api("/api/capture/start", {}), "Otwieram przeglądarkę…");
+};
+$("captureDone").onclick = () => act(() => api("/api/capture/finish", {}), "Analizuję…");
+$("setupServerSave").onclick = () => act(async () => {
+  const server = $("setupServer").value.trim();
+  if (!/^[a-z]{2}\d+$/i.test(server)) throw new Error("Podaj serwer w formacie np. pl1");
+  const { config } = await api("/api/config");
+  config.server = server.toLowerCase();
+  await api("/api/config", { config });
+  cfgOriginal = null;
+}, "Zapisano serwer");
+
+// ---------- status ----------
+async function refresh() {
+  try { status = await api("/api/status"); statusAt = performance.now(); render(); }
+  catch (e) { $("pillText").textContent = "Brak połączenia z panelem"; $("pill").className = "pill err"; }
+}
+
+function render() {
+  const s = status, b = s.bot, setup = s.setup, running = s.mode === "running";
+  $("server").textContent = setup.server || "—";
+
+  // header
+  const pill = $("pill");
+  let label = "Zatrzymany", cls = "pill";
+  if (s.mode === "capture") { label = "Łączenie z grą"; cls = "pill sim"; }
+  else if (running && s.run_kind === "sim") { label = `Symulacja ×${s.speed}`; cls = "pill sim run"; }
+  else if (running && s.run_kind === "dry") { label = "Na sucho"; cls = "pill dry run"; }
+  else if (running) { label = "Gra"; cls = "pill run"; }
+  else if (s.error) { label = "Zatrzymany – błąd"; cls = "pill err"; }
+  pill.className = cls; $("pillText").textContent = label;
+  if (running && s.run_kind && s.run_kind !== kind) {
+    document.querySelector(`#kindSeg button[data-kind="${s.run_kind}"]`).click();
+    if (s.run_kind === "sim") $("speed").value = String(s.speed);
+  }
+  $("startBtn").classList.toggle("hidden", running);
+  $("stopBtn").classList.toggle("hidden", !running);
+  $("startBtn").disabled = s.mode === "capture";
+  document.querySelectorAll("#kindSeg button").forEach((x) => x.disabled = running || s.mode === "capture");
+
+  // error + setup
+  $("errorCard").classList.toggle("hidden", !s.error);
+  $("errorText").textContent = s.error || "";
+  const capActive = s.capture && s.capture.active;
+  const capDone = s.capture && !s.capture.active && !running;
+  $("setupCard").classList.toggle("hidden", setup.ready && !capActive && !capDone);
+  $("step1").classList.toggle("done", setup.config_exists);
+  $("step2").classList.toggle("done", setup.ready);
+  if (document.activeElement !== $("setupServer")) $("setupServer").value = setup.server || "";
+  $("captureActive").classList.toggle("hidden", !capActive);
+  $("captureBtn").disabled = s.mode !== "stopped";
+  const cr = $("captureResult"), c = s.capture;
+  if (c && !c.active) {
+    cr.classList.remove("hidden");
+    if (c.error) { cr.className = "callout bad"; cr.textContent = "Nie udało się: " + c.error; }
+    else {
+      const ok = c.salt && (c.logged_in || c.login_template);
+      cr.className = "callout " + (ok ? "ok" : "warn");
+      cr.textContent = (ok ? "Połączono! " : "Połączenie niepełne. ") +
+        `Przechwycono ${c.requests} żądań; podpis: ${c.salt ? "OK" : "nie znaleziono"}; sesja: ${c.logged_in ? "OK" : "brak"}.` +
+        (c.notes && c.notes.length ? " " + c.notes.join(" ") : "") + (ok ? " Sprawdź jeszcze zakładkę Diagnostyka." : "");
+    }
+  } else cr.classList.add("hidden");
+
+  // now
+  if (!b) {
+    $("activity").textContent = s.mode === "capture" ? "Łączenie z grą…" : "Bot zatrzymany";
+    $("activitySub").textContent = s.mode === "capture" ? "Dokończ logowanie w przeglądarce." : "Wybierz tryb i kliknij Start.";
+    $("timerBox").classList.add("hidden");
+  } else {
+    $("activity").textContent = running ? b.activity : "Bot zatrzymany";
+    $("activitySub").textContent = running
+      ? (b.next_wake_in != null ? `Następna akcja za ${dur(b.next_wake_in / speedNow())}` : "")
+      : "Ostatni znany stan postaci poniżej.";
+    tickTimer();
+  }
+
+  // character
+  const ch = (b && b.character) || {};
+  $("lvl").textContent = ch.level ?? "–";
+  $("charName").textContent = ch.name || "—";
+  $("xp").textContent = n(ch.xp); $("coins").textContent = n(ch.coins); $("honor").textContent = n(ch.honor);
+  bar("energy", ch.quest_energy, ch.max_quest_energy);
+  bar("stamina", ch.duel_stamina, ch.max_duel_stamina);
+
+  // stats
+  const st = (b && b.stats) || {};
+  $("sQuests").textContent = n(st.quests_completed || 0);
+  $("sDuels").textContent = n(st.duels || 0);
+  $("sDuelsL").textContent = (st.duels_won || st.duels_lost) ? `Pojedynki (${st.duels_won || 0} W / ${st.duels_lost || 0} P)` : "Pojedynki";
+  $("sWork").textContent = n(st.work_completed || 0);
+  $("sErrors").textContent = n(st.errors || 0);
+  const g = (b && b.gained) || {};
+  const signed = (v) => v ? (v > 0 ? "+" : "−") + fmt.format(Math.abs(v)) : "0";
+  $("gXp").textContent = signed(g.xp); $("gCoins").textContent = signed(g.game_currency); $("gHonor").textContent = signed(g.honor);
+  $("dToday").textContent = b ? `${b.duels_today}/${b.duels_max}` : "0";
+  $("uptime").textContent = s.uptime ? "działa od " + dur(s.uptime) : "";
+}
+
+function speedNow() { return status && status.run_kind === "sim" ? status.speed : 1; }
+
+function bar(id, v, max) {
+  const has = v !== null && v !== undefined;
+  $(id + "Txt").textContent = has ? `${n(v)}${max ? " / " + n(max) : ""}` : "—";
+  $(id + "Bar").style.width = has && max ? Math.min(100, 100 * v / max) + "%" : "0%";
+}
+
+function tickTimer() {
+  const b = status && status.bot;
+  const item = b && status.mode === "running" && (b.quest || b.work);
+  $("timerBox").classList.toggle("hidden", !item);
+  if (!item) return;
+  const elapsed = (performance.now() - statusAt) / 1000 * speedNow();
+  const left = Math.max(0, item.remaining - elapsed);
+  $("timerLabel").textContent = b.quest ? `Misja #${item.id}` : "Praca";
+  $("timerLeft").textContent = "pozostało " + dur(left / speedNow());
+  $("timerBar").style.width = item.duration ? Math.min(100, 100 * (1 - left / item.duration)) + "%" : "0%";
+}
+
+// ---------- log ----------
+async function pollLog() {
+  try {
+    const { lines } = await api("/api/logs?after=" + logAfter);
+    if (lines.length) { logAfter = lines[lines.length - 1].id; logLines.push(...lines); logLines = logLines.slice(-600); drawLog(); }
+  } catch (e) { /* panel offline; status shows it */ }
+}
+function drawLog() {
+  const el = $("log"), only = $("onlyImportant").checked;
+  const frag = document.createDocumentFragment();
+  for (const l of logLines) {
+    if (only && l.level === "INFO") continue;
+    const d = document.createElement("div"); d.className = l.level;
+    const t = document.createElement("span"); t.className = "t"; t.textContent = clock(l.t);
+    d.append(t, l.msg); frag.append(d);
+  }
+  el.replaceChildren(frag);
+  if ($("autoscroll").checked) el.scrollTop = el.scrollHeight;
+}
+$("onlyImportant").onchange = drawLog;
+
+// ---------- settings ----------
+const STRAT_Q = [["xp_per_energy", "Najwięcej XP za energię"], ["xp_per_minute", "Najwięcej XP na minutę"],
+  ["coins_per_energy", "Najwięcej monet za energię"], ["coins_per_minute", "Najwięcej monet na minutę"], ["balanced", "Zrównoważona"]];
+const STRAT_D = [["weakest", "Najsłabszy rywal (najpewniejsza wygrana)"], ["honor", "Najwięcej honoru wśród słabszych"]];
+const SCHEMA = [
+  { title: "Konto", fields: [
+    { k: "server", label: "Serwer", type: "text", hint: "np. pl1, de3, us1" },
+    { k: "email", label: "E-mail do gry", type: "email", hint: "Potrzebny tylko do automatycznego ponownego logowania." },
+    { k: "password", label: "Hasło", type: "password", hint: "Zostaw puste, aby nie zmieniać. Zapisywane lokalnie w config.yaml." },
+  ]},
+  { title: "Zachowanie", fields: [
+    { k: "behaviour.active_hours", label: "Godziny gry", type: "hours" },
+    { k: "behaviour.min_delay", label: "Przerwa między akcjami (s)", type: "range2", k2: "behaviour.max_delay" },
+    { k: "behaviour.idle_poll_minutes", label: "Sprawdzaj stan co (min), gdy brak zajęć", type: "float" },
+    { k: "behaviour.max_runtime_hours", label: "Zatrzymaj po (h)", type: "float", hint: "0 = działaj bez końca" },
+  ]},
+  { title: "Misje", toggle: "quests.enabled", fields: [
+    { k: "quests.strategy", label: "Jak wybierać misje", type: "select", options: STRAT_Q },
+    { k: "quests.min_energy_reserve", label: "Zostaw energii", type: "int", hint: "Bot nie zejdzie poniżej tej wartości." },
+    { k: "quests.max_duration_minutes", label: "Maks. długość misji (min)", type: "float", hint: "0 = bez limitu" },
+    { k: "quests.prefer_items", label: "Preferuj misje z przedmiotem", type: "check" },
+    { k: "quests.avoid_fights", label: "Pomijaj misje-walki (można je przegrać)", type: "check" },
+  ]},
+  { title: "Pojedynki", toggle: "duels.enabled", fields: [
+    { k: "duels.strategy", label: "Kogo atakować", type: "select", options: STRAT_D },
+    { k: "duels.max_per_day", label: "Maks. pojedynków dziennie", type: "int" },
+    { k: "duels.max_power_ratio", label: "Maks. siła rywala (dla „honor”)", type: "float", step: "0.05", hint: "0.9 = rywal ma najwyżej 90% Twojej siły" },
+    { k: "duels.during_quest", label: "Walcz także w trakcie misji", type: "check" },
+  ]},
+  { title: "Praca", toggle: "work.enabled", fields: [
+    { k: "work.hours", label: "Ile godzin pracy", type: "int", hint: "Praca blokuje misje – bot idzie do pracy tylko, gdy nie ma nic innego do zrobienia." },
+  ]},
+  { title: "Zaawansowane", collapsed: true, fields: [
+    ...["login", "sync", "start_quest", "check_quest", "claim_quest", "get_opponents", "start_duel", "check_duel", "claim_duel", "start_work", "claim_work"]
+      .map((a) => ({ k: "actions." + a, label: "Akcja: " + a, type: "text" })),
+    { k: "params.quest_id", label: "Parametr: ID misji", type: "text" },
+    { k: "params.character_id", label: "Parametr: ID rywala", type: "text" },
+    { k: "params.hours", label: "Parametr: godziny pracy", type: "text" },
+    { k: "behaviour.resync_minutes", label: "Synchronizacja co (min)", type: "float" },
+    { k: "behaviour.max_consecutive_errors", label: "Zatrzymaj po tylu błędach z rzędu", type: "int" },
+    { k: "duels.default_stamina_cost", label: "Koszt pojedynku (gdy gra go nie poda)", type: "int" },
+    { k: "session_file", label: "Plik sesji", type: "text" },
+    { k: "log_file", label: "Plik dziennika", type: "text", hint: "puste = bez pliku" },
+  ]},
+];
+const get = (o, k) => k.split(".").reduce((x, p) => x == null ? x : x[p], o);
+const set = (o, k, v) => { const ps = k.split("."); const last = ps.pop(); ps.reduce((x, p) => x[p], o)[last] = v; };
+const fid = (k) => "f_" + k.replace(/\./g, "_");
+
+function input(type, id, extra = "") { return `<input type="${type}" id="${id}" ${extra}>`; }
+function buildForm() {
+  const grid = $("formGrid"); grid.innerHTML = "";
+  for (const sec of SCHEMA) {
+    const card = document.createElement("div"); card.className = "card";
+    let head = `<div class="section-head"><h3>${sec.title}</h3>`;
+    if (sec.toggle) head += `<label class="switch" title="Włącz/wyłącz"><input type="checkbox" id="${fid(sec.toggle)}"><span></span></label>`;
+    head += "</div>";
+    let body = "";
+    for (const f of sec.fields) {
+      const id = fid(f.k);
+      if (f.type === "check") { body += `<label class="check">${input("checkbox", id)} ${f.label}</label>`; continue; }
+      let ctl;
+      if (f.type === "select") ctl = `<select id="${id}">${f.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>`;
+      else if (f.type === "int") ctl = input("number", id, 'step="1" min="0"');
+      else if (f.type === "float") ctl = input("number", id, `step="${f.step || "any"}" min="0"`);
+      else if (f.type === "hours") ctl = `<label class="check">${input("checkbox", id + "_all")} Całą dobę</label>
+        <div class="two" id="${id}_box">${input("time", id + "_from")}${input("time", id + "_to")}</div>`;
+      else if (f.type === "range2") ctl = `<div class="two">${input("number", id, 'step="0.5" min="0" placeholder="od"')}${input("number", fid(f.k2), 'step="0.5" min="0" placeholder="do"')}</div>`;
+      else ctl = input(f.type, id, f.type === "password" ? 'autocomplete="new-password" placeholder="••••••"' : "");
+      body += `<div class="field"><label for="${id}">${f.label}</label>${ctl}${f.hint ? `<div class="hint">${f.hint}</div>` : ""}</div>`;
+    }
+    card.innerHTML = sec.collapsed ? `<details><summary>${sec.title}</summary>${body}</details>` : head + `<div class="sec-body">${body}</div>`;
+    grid.append(card);
+    if (sec.collapsed) card.classList.add("wide");
+  }
+  grid.addEventListener("input", onFormChange); grid.addEventListener("change", onFormChange);
+}
+function onFormChange() {
+  dirty = true; $("saveState").textContent = "Masz niezapisane zmiany";
+  syncDisabled();
+}
+function syncDisabled() {
+  for (const sec of SCHEMA) if (sec.toggle) {
+    const on = $(fid(sec.toggle)).checked;
+    $(fid(sec.toggle)).closest(".card").querySelector(".sec-body").classList.toggle("disabled-body", !on);
+  }
+  const id = fid("behaviour.active_hours");
+  $(id + "_box").classList.toggle("disabled-body", $(id + "_all").checked);
+}
+function fillForm(cfg) {
+  for (const sec of SCHEMA) {
+    if (sec.toggle) $(fid(sec.toggle)).checked = !!get(cfg, sec.toggle);
+    for (const f of sec.fields) {
+      const el = $(fid(f.k)), v = get(cfg, f.k);
+      if (f.type === "check") el.checked = !!v;
+      else if (f.type === "hours") {
+        const m = /^(\d\d?:\d\d)\s*-\s*(\d\d?:\d\d)$/.exec(v || "");
+        $(fid(f.k) + "_all").checked = !m;
+        $(fid(f.k) + "_from").value = m ? m[1].padStart(5, "0") : "07:30";
+        $(fid(f.k) + "_to").value = m ? m[2].padStart(5, "0") : "23:30";
+      } else if (f.type === "range2") { el.value = v; $(fid(f.k2)).value = get(cfg, f.k2); }
+      else el.value = v ?? "";
+    }
+  }
+  syncDisabled();
+}
+function readForm() {
+  const cfg = structuredClone(cfgOriginal);
+  for (const sec of SCHEMA) {
+    if (sec.toggle) set(cfg, sec.toggle, $(fid(sec.toggle)).checked);
+    for (const f of sec.fields) {
+      const el = $(fid(f.k));
+      if (f.type === "check") set(cfg, f.k, el.checked);
+      else if (f.type === "int") set(cfg, f.k, Math.round(Number(el.value || 0)));
+      else if (f.type === "float") set(cfg, f.k, Number(el.value || 0));
+      else if (f.type === "hours") set(cfg, f.k, $(fid(f.k) + "_all").checked ? "" : `${$(fid(f.k) + "_from").value}-${$(fid(f.k) + "_to").value}`);
+      else if (f.type === "range2") {
+        const a = Number(el.value || 0), b = Number($(fid(f.k2)).value || 0);
+        set(cfg, f.k, Math.min(a, b)); set(cfg, f.k2, Math.max(a, b));
+      } else set(cfg, f.k, el.value.trim());
+    }
+  }
+  return cfg;
+}
+async function loadConfig() {
+  try {
+    const data = await api("/api/config");
+    cfgOriginal = data.config; $("cfgPath").textContent = data.path;
+    if (!$("formGrid").children.length) buildForm();
+    fillForm(cfgOriginal);
+    $(fid("password")).placeholder = data.password_set ? "•••••• (ustawione)" : data.env_credentials ? "z HZ_PASSWORD" : "";
+    dirty = false; $("saveState").textContent = "Brak niezapisanych zmian";
+  } catch (e) { toast(e.message); }
+}
+$("saveBtn").onclick = () => act(async () => {
+  await api("/api/config", { config: readForm() });
+  await loadConfig();
+}, "Zapisano ustawienia");
+$("resetBtn").onclick = () => loadConfig();
+
+// ---------- diagnostics ----------
+async function loadDoctor() {
+  let d;
+  try { d = await api("/api/doctor"); } catch (e) { $("diagSession").textContent = e.message; return; }
+  const s = d.session;
+  $("diagSession").innerHTML = "";
+  if (!s) { $("diagSession").innerHTML = `<div class="callout warn">Brak połączenia z grą – kliknij „Połącz ponownie”.</div>`; }
+  else {
+    const dl = document.createElement("dl"); dl.className = "kv"; dl.style.margin = 0;
+    const rows = [["Adres", s.url], ["Użytkownik", s.user_id], ["Sesja", s.logged_in ? "aktywna" : "brak"],
+      ["Podpis (sól)", s.salt ? "znaleziony" : "BRAK"], ["Parametry stałe", s.base_params.join(", ") || "—"]];
+    for (const [k, v] of rows) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; dl.append(dt, dd); }
+    $("diagSession").append(dl);
+  }
+  const label = { ok: "OK", unseen: "Nie widziano", disabled: "Wyłączona" };
+  const ACTION_LABELS = { login: "Logowanie", sync: "Odświeżenie stanu", start_quest: "Start misji",
+    check_quest: "Sprawdzenie misji", claim_quest: "Nagroda za misję", get_opponents: "Lista rywali",
+    start_duel: "Start pojedynku", check_duel: "Sprawdzenie pojedynku", claim_duel: "Nagroda za pojedynek",
+    start_work: "Start pracy", claim_work: "Wypłata za pracę" };
+  const t = $("diagTable");
+  t.innerHTML = d.actions.length ? "<tr><th>Funkcja</th><th>Akcja</th><th>Status</th><th>Parametry w grze</th></tr>" : "";
+  for (const r of d.actions) {
+    const tr = t.insertRow();
+    tr.insertCell().textContent = ACTION_LABELS[r.name] || r.name;
+    const c = tr.insertCell(); const code = document.createElement("code"); code.textContent = r.action || "—"; c.append(code);
+    const st = document.createElement("span"); st.className = "chip " + r.status; st.textContent = label[r.status]; tr.insertCell().append(st);
+    tr.insertCell().textContent = r.params.join(", ") || "—";
+  }
+  const ex = $("diagExtra"); ex.innerHTML = "";
+  if (d.extra.length) {
+    const h = document.createElement("h2"); h.style.marginTop = "18px"; h.textContent = "Inne akcje widziane w grze";
+    const ul = document.createElement("div"); ul.className = "small";
+    for (const e of d.extra) { const p = document.createElement("div"); const code = document.createElement("code"); code.textContent = e.action; p.append(code, " — " + (e.params.join(", ") || "bez parametrów")); ul.append(p); }
+    ex.append(h, ul);
+  }
+}
+$("pingBtn").onclick = () => act(async () => {
+  const r = await api("/api/ping", {});
+  toast(`Połączenie OK${r.name ? `: ${r.name}, poziom ${r.level}` : ""}`);
+});
+
+// ---------- loop ----------
+async function loop() {
+  if (!document.hidden) await Promise.all([refresh(), pollLog()]);
+  setTimeout(loop, 1000);
+}
+setInterval(() => { if (status && status.mode === "running") tickTimer(); }, 250);
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+loop();
+</script>
+</body>
+</html>

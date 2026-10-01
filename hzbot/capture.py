@@ -98,7 +98,13 @@ def analyze(request_url: str, forms: list[dict[str, str]], sources: list[str]) -
     return CaptureReport(session, len(forms), salt is not None, bool(login_forms), notes)
 
 
-def run_capture(url: str, headless: bool = False, timeout_minutes: float = 20) -> CaptureReport:
+def run_capture(
+    url: str,
+    headless: bool = False,
+    timeout_minutes: float = 20,
+    done: threading.Event | None = None,
+) -> CaptureReport:
+    """Capture until Enter is pressed - or until ``done`` is set, when given (GUI)."""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -120,7 +126,8 @@ def run_capture(url: str, headless: bool = False, timeout_minutes: float = 20) -
         if "javascript" in ctype or resp.url.split("?")[0].endswith(".js"):
             script_urls.append(resp.url)
 
-    done = threading.Event()
+    interactive = done is None
+    done = done or threading.Event()
 
     def wait_enter() -> None:
         # On EOF (no terminal) keep capturing until the timeout instead.
@@ -135,20 +142,24 @@ def run_capture(url: str, headless: bool = False, timeout_minutes: float = 20) -
         context.on("response", on_response)
         page = context.new_page()
         page.goto(url)
-        print(
-            "\nW otwartym oknie przeglądarki:\n"
-            "  1. Zaloguj się na swoje konto (e-mail + hasło).\n"
-            "  2. Wejdź do gry i wykonaj kilka akcji: rozpocznij misję, otwórz pojedynki itp.\n"
-            "  3. Wróć tutaj i naciśnij Enter.\n"
-        )
-        threading.Thread(target=wait_enter, daemon=True).start()
+        if interactive:
+            print(
+                "\nW otwartym oknie przeglądarki:\n"
+                "  1. Zaloguj się na swoje konto (e-mail + hasło).\n"
+                "  2. Wejdź do gry i wykonaj kilka akcji: rozpocznij misję, otwórz pojedynki itp.\n"
+                "  3. Wróć tutaj i naciśnij Enter.\n"
+            )
+            threading.Thread(target=wait_enter, daemon=True).start()
         waited = 0.0
         while not done.is_set() and waited < timeout_minutes * 60:
-            page.wait_for_timeout(500)  # keeps Playwright's event loop running
+            try:
+                page.wait_for_timeout(500)  # keeps Playwright's event loop running
+            except Exception:  # user closed the browser window
+                break
             waited += 0.5
 
         sources = []
-        for frame in page.frames:
+        for frame in (page.frames if not page.is_closed() else []):
             try:
                 sources.append(frame.content())
             except Exception:  # detached frame
@@ -160,7 +171,30 @@ def run_capture(url: str, headless: bool = False, timeout_minutes: float = 20) -
                     sources.append(r.text())
             except Exception as exc:
                 log.debug("Nie pobrano %s: %s", s_url, exc)
-        browser.close()
+        try:
+            browser.close()
+        except Exception:
+            pass
 
     request_url = request_urls[-1] if request_urls else url.rstrip("/") + "/request.php"
     return analyze(request_url, forms, sources)
+
+
+def merge_and_save(report: CaptureReport, path: str, salt: str = "") -> Session:
+    """Save the captured session, keeping actions observed in earlier captures."""
+    from pathlib import Path
+
+    session = report.session
+    if salt:
+        session.salt = salt
+    previous = Path(path)
+    if previous.exists():
+        old = Session.load(previous)
+        for action, names in old.observed_actions.items():
+            session.observed_actions[action] = sorted(set(names) | set(session.observed_actions.get(action, [])))
+        if not session.salt:
+            session.salt = old.salt
+        if not session.login_template:
+            session.login_template = old.login_template
+    session.save(path)
+    return session
