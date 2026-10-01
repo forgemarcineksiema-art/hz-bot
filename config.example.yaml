@@ -1,0 +1,60 @@
+# Skopiuj do config.yaml i dostosuj. Wszystkie opcje są opcjonalne.
+
+server: pl1                 # subdomena serwera gry: pl1, de3, us1 ... (https://pl1.herozerogame.com)
+session_file: session.json  # tworzony przez `hzbot capture`
+log_file: hzbot.log         # "" = tylko konsola
+
+# Potrzebne tylko do automatycznego ponownego logowania po wygaśnięciu sesji.
+# Lepiej użyć zmiennych środowiskowych HZ_EMAIL i HZ_PASSWORD.
+email: ""
+password: ""
+
+behaviour:
+  dry_run: false            # true = tylko pokazuj decyzje, nic nie wykonuj
+  min_delay: 1.5            # losowa przerwa między akcjami (sekundy)
+  max_delay: 4.0
+  active_hours: "07:30-23:30"   # bot gra tylko w tym oknie; "" = całą dobę
+  idle_poll_minutes: 15     # co ile sprawdzać stan, gdy nie ma nic do zrobienia
+  resync_minutes: 10
+  max_runtime_hours: 0      # 0 = bez limitu
+  max_consecutive_errors: 5
+
+quests:                     # misje
+  enabled: true
+  # xp_per_energy | coins_per_energy | xp_per_minute | coins_per_minute | balanced
+  strategy: xp_per_energy
+  min_energy_reserve: 0     # zostaw tyle energii niewykorzystanej
+  max_duration_minutes: 0   # 0 = bez limitu
+  prefer_items: false       # premiuj misje z przedmiotem w nagrodę
+  avoid_fights: false       # pomijaj misje-walki (można je przegrać)
+
+duels:                      # pojedynki
+  enabled: true
+  strategy: weakest         # weakest = najsłabszy rywal; honor = najwięcej honoru wśród słabszych
+  max_power_ratio: 0.9      # dla "honor": rywal max 90% naszej siły
+  max_per_day: 50
+  during_quest: false       # czy walczyć w trakcie trwania misji
+  default_stamina_cost: 20
+
+work:                       # praca (blokuje misje - uruchamiana, gdy nie ma nic innego)
+  enabled: false
+  hours: 1
+
+# Nazwy akcji serwera. Zweryfikuj je przez `hzbot doctor` i popraw, jeśli gra używa innych.
+actions:
+  login: loginUser
+  sync: syncGame
+  start_quest: startQuest
+  check_quest: checkForQuestComplete
+  claim_quest: claimQuestRewards
+  get_opponents: getDuelOpponents
+  start_duel: startDuel
+  check_duel: ""
+  claim_duel: claimDuelRewards
+  start_work: startWork
+  claim_work: claimWorkReward
+
+params:
+  quest_id: quest_id
+  character_id: character_id
+  hours: hours
